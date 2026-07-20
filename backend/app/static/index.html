@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16231c">
+  <title>HANALL AI - Catalog Extractor</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2315221b'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='34' font-family='Georgia' font-weight='700' fill='white'%3EH%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand-lockup" href="/" aria-label="HANALL AI 홈">
+      <span class="brand-mark">H</span>
+      <span><strong>HANALL AI</strong><small>Catalog Extractor</small></span>
+    </a>
+    <div class="topbar-actions"><a class="topbar-link" href="/">공간 시뮬레이터</a><div class="topbar-status"><span class="status-dot"></span> 카탈로그 데이터베이스 도구</div></div>
+  </header>
+
+  <main>
+    <section id="uploadView" class="hero-shell">
+      <div class="hero-copy">
+        <p class="eyebrow">MULTI-PDF MATERIAL PIPELINE</p>
+        <h1>카탈로그 여러 권을<br><em>하나의 자재 DB</em>로.</h1>
+        <p class="hero-description">벽지 PDF를 한 번에 올리면 품번과 실제 샘플을 연결하고, 중복을 정리해 HANALL AI에서 바로 쓸 수 있는 데이터로 만듭니다.</p>
+        <div class="feature-row">
+          <span>품번 자동 인식</span><span>샘플 자동 크롭</span><span>검수·수정</span><span>ZIP 내보내기</span>
+        </div>
+      </div>
+
+      <div class="upload-panel card">
+        <div class="panel-title-row">
+          <div><span class="step-number">01</span><h2>카탈로그 등록</h2></div>
+          <span class="file-limit">PDF 최대 20개</span>
+        </div>
+        <button id="dropZone" class="drop-zone" type="button">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></svg>
+          </span>
+          <strong>PDF를 끌어놓거나 눌러서 선택</strong>
+          <small>여러 브랜드·컬렉션을 동시에 선택할 수 있습니다.</small>
+        </button>
+        <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+        <div id="selectedFiles" class="selected-files"></div>
+        <div id="uploadEmpty" class="upload-empty">선택된 파일이 없습니다.</div>
+        <div class="panel-footer">
+          <p>브랜드·컬렉션을 비워두면 표지와 파일명에서 자동 추정합니다.</p>
+          <button id="startButton" class="primary-button" type="button" disabled>
+            <span>추출 시작</span><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="progressView" class="workspace hidden">
+      <div class="processing-card card">
+        <div class="processing-visual">
+          <div class="scanner"><span></span><span></span><span></span><i></i></div>
+        </div>
+        <div class="processing-copy">
+          <p class="eyebrow">CATALOG ANALYSIS</p>
+          <h2>자재 샘플을 찾고 있습니다</h2>
+          <p id="progressStep">PDF를 준비하는 중...</p>
+          <div class="progress-track"><span id="progressBar"></span></div>
+          <div class="progress-meta"><strong id="progressPercent">0%</strong><span id="progressPages">0 / 0 페이지</span></div>
+        </div>
+      </div>
+      <div id="catalogProgress" class="catalog-progress-list"></div>
+    </section>
+
+    <section id="resultsView" class="workspace hidden">
+      <div class="results-heading">
+        <div>
+          <p class="eyebrow">EXTRACTION COMPLETE</p>
+          <h1>통합 자재 라이브러리</h1>
+          <p>자동 추출 결과를 확인하고 잘못 잡힌 품번이나 이미지 영역을 바로 수정하세요.</p>
+        </div>
+        <div class="heading-actions">
+          <button id="newJobButton" class="secondary-button" type="button">새 카탈로그</button>
+          <button id="activateButton" class="secondary-button" type="button">앱에 적용</button>
+          <a id="exportButton" class="primary-button" href="#"><span>ZIP 내보내기</span><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg></a>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <article class="metric-card card"><span>등록 제품</span><strong id="metricProducts">0</strong><small>중복 병합 후</small></article>
+        <article class="metric-card card"><span>브랜드</span><strong id="metricBrands">0</strong><small>자동·수동 메타데이터</small></article>
+        <article class="metric-card card"><span>검수 필요</span><strong id="metricReview">0</strong><small>신뢰도 70% 미만</small></article>
+        <article class="metric-card card"><span>중복 병합</span><strong id="metricDuplicates">0</strong><small>출처 이력은 유지</small></article>
+      </div>
+
+      <div class="library-toolbar card">
+        <label class="search-box">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="searchInput" type="search" placeholder="품번, 브랜드, 컬렉션 검색">
+        </label>
+        <select id="brandFilter" aria-label="브랜드 필터"><option value="">모든 브랜드</option></select>
+        <select id="catalogFilter" aria-label="카탈로그 필터"><option value="">모든 카탈로그</option></select>
+        <select id="statusFilter" aria-label="검수 상태 필터">
+          <option value="">모든 상태</option>
+          <option value="review">검수 필요</option>
+          <option value="reviewed">검수 완료</option>
+          <option value="auto">자동 추출</option>
+          <option value="excluded">제외됨</option>
+        </select>
+      </div>
+
+      <div class="library-meta"><span id="resultCount">0개 제품</span><span class="legend"><i class="review-dot"></i> 검수 필요 항목</span></div>
+      <div id="productGrid" class="product-grid"></div>
+      <div id="noResults" class="no-results hidden"><strong>조건에 맞는 제품이 없습니다.</strong><p>검색어나 필터를 바꿔보세요.</p></div>
+    </section>
+  </main>
+
+  <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div><p class="eyebrow">MANUAL REVIEW</p><h2 id="modalTitle">제품 검수·수정</h2></div>
+        <button class="icon-button" data-close-modal type="button" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="crop-column">
+          <div class="crop-instruction"><strong>샘플 영역 수정</strong><span>박스를 이동하거나 우측 아래 손잡이로 크기를 조절하세요.</span></div>
+          <div id="cropStage" class="crop-stage">
+            <img id="pagePreview" alt="카탈로그 원본 페이지">
+            <div id="cropBox" class="crop-box"><i class="resize-handle"></i></div>
+          </div>
+          <div class="source-meta"><span id="sourcePdf"></span><span id="sourcePage"></span></div>
+        </div>
+        <form id="editForm" class="edit-form">
+          <div class="current-texture"><img id="texturePreview" alt="현재 추출 샘플"><span>현재 샘플</span></div>
+          <label>품번<input id="editCode" required maxlength="80"></label>
+          <label>브랜드<input id="editBrand" maxlength="120"></label>
+          <label>카탈로그<input id="editCatalog" maxlength="180"></label>
+          <label>컬렉션<input id="editCollection" maxlength="180"></label>
+          <div class="confidence-row"><span>자동 추출 신뢰도</span><strong id="editConfidence"></strong></div>
+          <label class="exclude-toggle"><input id="editExcluded" type="checkbox"><span>이 항목을 최종 DB에서 제외</span></label>
+          <div class="edit-actions">
+            <button class="secondary-button" data-close-modal type="button">취소</button>
+            <button class="primary-button" type="submit">수정 저장</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

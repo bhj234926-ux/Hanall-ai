@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: hanall-ai-catalog-bhj234926
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: HANALL_DATA_DIR
+        value: /tmp/hanall-data
+      - key: HANALL_MAX_FILES
+        value: "20"
+      - key: HANALL_MAX_FILE_MB
+        value: "300"

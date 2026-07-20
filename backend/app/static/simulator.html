@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#142219">
+  <title>HANALL AI - 우리 집 인테리어 미리보기</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2315221b'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='34' font-family='Georgia' font-weight='700' fill='white'%3EH%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/simulator.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">H</span><span><strong>HANALL AI</strong><small>INTERIOR VISUALIZER</small></span></a>
+    <nav><a href="/admin/catalogs">카탈로그 관리</a><button id="reset" type="button">처음으로</button></nav>
+  </header>
+
+  <main>
+    <section id="start" class="start-screen">
+      <div class="start-copy">
+        <p class="eyebrow">REAL MATERIAL · REAL SPACE</p>
+        <h1>사진 한 장으로,<br><em>완성될 공간</em>을 먼저.</h1>
+        <p>방 사진을 올리고 실제 카탈로그 품번을 선택하세요.<br>벽의 빛과 그림자를 유지해 시공 후 모습을 미리 보여드립니다.</p>
+        <div class="start-actions">
+          <button id="cameraBtn" class="primary" type="button">사진 촬영하기</button>
+          <button id="albumBtn" class="secondary" type="button">앨범에서 선택</button>
+        </div>
+        <div class="privacy">사진은 브라우저 안에서만 처리되며 서버에 저장되지 않습니다.</div>
+      </div>
+      <div class="start-visual" aria-hidden="true">
+        <div class="room-card before-card"><span>BEFORE</span><i></i><b></b></div>
+        <div class="room-card after-card"><span>AFTER</span><i></i><b></b><u></u></div>
+        <div class="material-count"><strong id="catalogCount">0</strong><span>실제 자재 등록</span></div>
+      </div>
+    </section>
+
+    <section id="editor" class="editor hidden">
+      <aside class="side-panel">
+        <div class="side-heading">
+          <p class="eyebrow">MATERIAL LIBRARY</p>
+          <h2>실제 자재 선택</h2>
+          <p id="catalogMeta">자재 목록을 불러오는 중입니다.</p>
+        </div>
+        <label class="material-search"><span>⌕</span><input id="materialSearch" type="search" placeholder="품번·브랜드 검색"></label>
+        <div id="aiStatus" class="ai-status"><strong>AI 준비</strong><span id="aiText">사진을 올리면 벽을 자동 분석합니다.</span><div id="loader" class="loader hidden"><i></i></div></div>
+        <div id="materials" class="materials"></div>
+        <div id="emptyMaterials" class="empty-materials hidden"><strong>등록된 자재가 없습니다.</strong><span>관리자 화면에서 PDF를 추출한 뒤<br>‘앱에 적용’을 눌러주세요.</span><a href="/admin/catalogs">카탈로그 등록하기</a></div>
+      </aside>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <button id="aiBtn" class="tool primary" type="button">벽 자동 인식</button>
+          <button id="areaBtn" class="tool secondary" type="button">4점 수동 보정</button>
+          <button id="beforeBtn" class="tool secondary" type="button">원본</button>
+          <button id="afterBtn" class="tool secondary" type="button">적용</button>
+          <button id="saveBtn" class="tool secondary" type="button">결과 저장</button>
+          <button id="changeBtn" class="tool secondary" type="button">사진 변경</button>
+        </div>
+        <div class="stage-wrap">
+          <div class="stage"><img id="room" alt="업로드한 공간"><canvas id="canvas"></canvas><div id="hint" class="hint">사진을 선택하면 벽 분석이 시작됩니다.</div></div>
+        </div>
+        <div class="selection-bar"><div><span>선택 자재</span><strong id="selectedLabel">자재를 선택해 주세요</strong></div><small id="selectedMeta">실제 카탈로그 DB 연동</small></div>
+      </section>
+    </section>
+  </main>
+
+  <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+  <input id="albumInput" type="file" accept="image/*" hidden>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="/static/simulator.js"></script>
+</body>
+</html>
+
