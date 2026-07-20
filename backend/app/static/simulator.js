@@ -212,7 +212,22 @@ function textureLayer() {
   const scale = Math.max(.45, canvas.width / 1800);
   const pattern = context.createPattern(texture, "repeat");
   context.save(); context.scale(scale, scale); context.fillStyle = pattern; context.fillRect(0, 0, layer.width / scale, layer.height / scale); context.restore();
-  context.globalCompositeOperation = "multiply"; context.globalAlpha = .3; context.drawImage(room, 0, 0, layer.width, layer.height);
+
+  // Preserve the catalog texture's real color. Only the room's monochrome
+  // luminance is blended back in so shadows remain without the old wall color
+  // showing through like a transparent film.
+  const shading = document.createElement("canvas");
+  shading.width = layer.width; shading.height = layer.height;
+  const shadingContext = shading.getContext("2d");
+  shadingContext.filter = "grayscale(1) contrast(.9) brightness(1.08)";
+  shadingContext.drawImage(room, 0, 0, shading.width, shading.height);
+  shadingContext.filter = "none";
+
+  context.globalCompositeOperation = "multiply";
+  context.globalAlpha = .24;
+  context.drawImage(shading, 0, 0);
+  context.globalAlpha = 1;
+  context.globalCompositeOperation = "source-over";
   return layer;
 }
 
@@ -230,12 +245,12 @@ function drawTextureMask() {
   const mask = document.createElement("canvas"); mask.width = canvas.width; mask.height = canvas.height; mask.getContext("2d").putImageData(wallMask, 0, 0);
   const output = document.createElement("canvas"); output.width = canvas.width; output.height = canvas.height;
   const context = output.getContext("2d"); context.drawImage(layer, 0, 0); context.globalCompositeOperation = "destination-in"; context.drawImage(mask, 0, 0);
-  ctx.globalAlpha = .9; ctx.drawImage(output, 0, 0); ctx.globalAlpha = 1;
+  ctx.globalAlpha = 1; ctx.drawImage(output, 0, 0);
 }
 
 function drawTexturePolygon() {
   const layer = textureLayer();
-  ctx.save(); ctx.beginPath(); ctx.moveTo(...points[0]); for (let index = 1; index < 4; index += 1) ctx.lineTo(...points[index]); ctx.closePath(); ctx.clip(); ctx.globalAlpha = .9; ctx.drawImage(layer, 0, 0); ctx.restore(); ctx.globalAlpha = 1;
+  ctx.save(); ctx.beginPath(); ctx.moveTo(...points[0]); for (let index = 1; index < 4; index += 1) ctx.lineTo(...points[index]); ctx.closePath(); ctx.clip(); ctx.globalAlpha = 1; ctx.drawImage(layer, 0, 0); ctx.restore();
 }
 
 function drawManualPoints() {
