@@ -1,4 +1,21 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://hanall-ai-catalog-bhj234926.onrender.com/",
+      "permanent": false
+    },
+    {
+      "source": "/catalog",
+      "destination": "https://hanall-ai-catalog-bhj234926.onrender.com/admin/catalogs",
+      "permanent": false
+    },
+    {
+      "source": "/admin/catalogs",
+      "destination": "https://hanall-ai-catalog-bhj234926.onrender.com/admin/catalogs",
+      "permanent": false
+    }
+  ]
 }
