@@ -4,20 +4,25 @@ import json
 import re
 import shutil
 import uuid
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
-from .config import BASE_DIR, MAX_FILE_BYTES, MAX_FILES, ensure_data_dirs, job_dir
+from .backup import create_catalog_backup, list_catalog_backups
+from .config import ADMIN_TOKEN, BASE_DIR, DATA_DIR, MAX_FILE_BYTES, MAX_FILES, MAX_IMAGE_BYTES, ensure_data_dirs, job_dir
 from .db import (
     create_job,
     get_active_job_id,
     get_all_products,
     get_catalogs,
+    get_catalog_versions,
     get_job,
     get_product,
     init_db,
@@ -37,6 +42,7 @@ from .extractor import (
     product_to_db,
     recrop_page_image,
 )
+from .vision import VisionUnavailable, gpu_configured, segment_room
 
 
 STATIC_DIR = BASE_DIR / "app" / "static"
@@ -58,6 +64,13 @@ class ProductUpdate(BaseModel):
 
 class CropUpdate(BaseModel):
     bbox: list[float] = Field(min_length=4, max_length=4)
+
+
+def require_admin(x_hanall_admin_token: str | None = Header(default=None)) -> None:
+    if not ADMIN_TOKEN:
+        raise HTTPException(503, "Admin backup access is not configured")
+    if x_hanall_admin_token != ADMIN_TOKEN:
+        raise HTTPException(401, "Invalid admin token")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -92,6 +105,51 @@ def catalog_admin() -> FileResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "hanall-catalog-extractor"}
+
+
+@app.get("/api/system/status")
+def system_status() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "gpu_vision_configured": gpu_configured(),
+        "storage_mode": "persistent" if str(DATA_DIR).replace("\\", "/").startswith("/var/data") else "local-or-ephemeral",
+        "catalog_versions": len(get_catalog_versions()),
+    }
+
+
+@app.get("/api/catalog/versions")
+def catalog_versions() -> dict[str, Any]:
+    return {"items": get_catalog_versions()}
+
+
+@app.get("/api/admin/backups", dependencies=[Depends(require_admin)])
+def backups() -> dict[str, Any]:
+    return {"items": list_catalog_backups()}
+
+
+@app.post("/api/admin/backup", dependencies=[Depends(require_admin)])
+def create_backup() -> FileResponse:
+    archive = create_catalog_backup()
+    return FileResponse(archive, media_type="application/zip", filename=archive.name)
+
+
+@app.post("/api/vision/segment")
+async def segment_space(image: UploadFile = File(...)) -> dict[str, Any]:
+    content_type = image.content_type or "application/octet-stream"
+    if not content_type.startswith("image/"):
+        raise HTTPException(400, "이미지 파일을 선택해 주세요.")
+    payload = await image.read(MAX_IMAGE_BYTES + 1)
+    if len(payload) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, "이미지 파일이 너무 큽니다.")
+    try:
+        with Image.open(BytesIO(payload)) as source:
+            source.verify()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(400, "올바른 이미지 파일이 아닙니다.") from exc
+    try:
+        return await run_in_threadpool(segment_room, payload, content_type)
+    except VisionUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @app.post("/api/jobs", status_code=202)

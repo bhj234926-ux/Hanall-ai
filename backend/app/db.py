@@ -7,7 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .config import DB_PATH, ensure_data_dirs
+from .config import BACKUP_DIR, DB_PATH, ensure_data_dirs
+
+
+SCHEMA_VERSION = 2
 
 
 def utc_now() -> str:
@@ -29,6 +32,8 @@ def connect() -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
+    ensure_data_dirs()
+    _backup_before_migration()
     with connect() as db:
         db.executescript(
             """
@@ -97,8 +102,42 @@ def init_db() -> None:
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS catalog_versions (
+                version INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+                activated_at TEXT NOT NULL,
+                note TEXT NOT NULL DEFAULT ''
+            );
             """
         )
+        db.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+            (SCHEMA_VERSION, utc_now()),
+        )
+        db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _backup_before_migration() -> None:
+    if not DB_PATH.is_file() or DB_PATH.stat().st_size == 0:
+        return
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = BACKUP_DIR / f"pre-migration-{timestamp}.sqlite3"
+    source = sqlite3.connect(DB_PATH, timeout=30)
+    destination = sqlite3.connect(target)
+    try:
+        source.backup(destination)
+    finally:
+        destination.close()
+        source.close()
+    snapshots = sorted(BACKUP_DIR.glob("pre-migration-*.sqlite3"), reverse=True)
+    for expired in snapshots[7:]:
+        expired.unlink(missing_ok=True)
 
 
 def create_job(job_id: str, catalogs: list[dict[str, Any]]) -> None:
@@ -340,6 +379,30 @@ def set_active_job(job_id: str) -> None:
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at""",
             (job_id, utc_now()),
         )
+        db.execute(
+            "INSERT OR IGNORE INTO catalog_versions (job_id, activated_at) VALUES (?, ?)",
+            (job_id, utc_now()),
+        )
+
+
+def get_catalog_versions() -> list[dict[str, Any]]:
+    with connect() as db:
+        return [
+            dict(row)
+            for row in db.execute(
+                """SELECT v.version, v.job_id, v.activated_at, v.note,
+                j.products_total, j.total_catalogs
+                FROM catalog_versions v
+                JOIN jobs j ON j.id = v.job_id
+                ORDER BY v.version DESC"""
+            ).fetchall()
+        ]
+
+
+def get_schema_version() -> int:
+    with connect() as db:
+        row = db.execute("PRAGMA user_version").fetchone()
+        return int(row[0]) if row else 0
 
 
 def get_active_job_id() -> str | None:

@@ -140,12 +140,68 @@ async function getSegmenter() {
   } finally { modelLoading = false; }
 }
 
+function maskFromImageSource(source, width, height) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const surface = document.createElement("canvas");
+      surface.width = width;
+      surface.height = height;
+      const context = surface.getContext("2d");
+      context.drawImage(image, 0, 0, width, height);
+      const pixels = context.getImageData(0, 0, width, height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        const luminance = Math.max(pixels.data[index], pixels.data[index + 1], pixels.data[index + 2]);
+        pixels.data[index] = 255;
+        pixels.data[index + 1] = 255;
+        pixels.data[index + 2] = 255;
+        pixels.data[index + 3] = luminance > 20 ? 255 : 0;
+      }
+      resolve(pixels);
+    };
+    image.onerror = () => reject(new Error("GPU mask image could not be decoded."));
+    image.src = source.startsWith("data:") ? source : `data:image/png;base64,${source}`;
+  });
+}
+
+async function detectWallOnServer() {
+  const source = await fetch(currentDataUrl);
+  const blob = await source.blob();
+  const form = new FormData();
+  form.append("image", blob, "room.jpg");
+  const response = await fetch("/api/vision/segment", { method: "POST", body: form });
+  if (response.status === 503) return null;
+  if (!response.ok) throw new Error(`GPU vision request failed (${response.status})`);
+  const result = await response.json();
+  const wall = result?.masks?.wall;
+  if (!wall) throw new Error("GPU vision response did not include a wall mask.");
+  return {
+    mask: await maskFromImageSource(wall, canvas.width, canvas.height),
+    model: result.model || "GPU vision",
+  };
+}
+
 async function detectWall() {
   if (!currentDataUrl) return;
   manual = false; points = []; wallMask = null; draw();
   hint.textContent = "AI가 벽을 찾는 중입니다...";
   setStatus("AI 분석 중", "벽, 바닥, 천장과 가구를 구분하고 있습니다.", true);
   try {
+    try {
+      const serverResult = await detectWallOnServer();
+      if (serverResult) {
+        wallMask = serverResult.mask;
+        const serverCoverage = maskCoverage(wallMask);
+        if (serverCoverage < .025 || serverCoverage > .85) throw new Error("GPU wall coverage is outside the safe range.");
+        setStatus("GPU AI 벽 인식 완료", `사진의 약 ${Math.round(serverCoverage * 100)}%를 벽으로 인식했습니다.`, false);
+        hint.textContent = "GPU AI 인식 완료 · 필요한 경우 4점 수동 보정 가능";
+        draw();
+        return;
+      }
+    } catch (serverError) {
+      console.warn("GPU vision unavailable; using browser fallback.", serverError);
+    }
+
     const model = await getSegmenter();
     const result = await model(currentDataUrl, { subtask: "semantic" });
     const walls = result.filter((item) => String(item.label).toLowerCase().includes("wall"));
